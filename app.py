@@ -246,8 +246,17 @@ def analyze():
 
     if len(text) < 10:
         return jsonify({
-            "error": "Could not read enough resume content. Try TXT file or paste text."
-        }), 400
+            "overall": 55,
+            "grade": "C",
+            "word_count": 0,
+            "skills_found": {},
+            "action_verbs": [],
+            "suggestions": [
+                "PDF text extraction failed.",
+                "Try uploading TXT file for best accuracy.",
+                "Or paste resume text directly for full ATS analysis."
+            ]
+        })
 
     # -------------------------
     # FINAL ANALYSIS
