@@ -12,23 +12,13 @@ app = Flask(__name__)
 
 SKILLS_DB = {
     "Programming": [
-        "python",
-        "java",
-        "javascript",
-        "c++",
-        "c",
-        "sql",
-        "html",
-        "css"
+        "python", "java", "javascript",
+        "c++", "c", "sql", "html", "css"
     ],
 
     "Web Development": [
-        "react",
-        "node.js",
-        "flask",
-        "django",
-        "mongodb",
-        "mysql"
+        "react", "node.js", "flask",
+        "django", "mongodb", "mysql"
     ],
 
     "AI / ML": [
@@ -40,11 +30,8 @@ SKILLS_DB = {
     ],
 
     "Tools": [
-        "git",
-        "github",
-        "docker",
-        "aws",
-        "linux"
+        "git", "github", "docker",
+        "aws", "linux"
     ]
 }
 
@@ -71,7 +58,6 @@ STRONG_ACTION_VERBS = [
 # =========================
 
 def extract_text_from_pdf(file):
-
     text = ""
 
     try:
@@ -95,16 +81,30 @@ def extract_text_from_pdf(file):
 
 
 # =========================
+# TXT FILE EXTRACTION
+# =========================
+
+def extract_text_from_txt(file):
+    text = ""
+
+    try:
+        file.seek(0)
+        text = file.read().decode("utf-8", errors="ignore")
+
+    except Exception as e:
+        print("TXT Error:", e)
+        text = ""
+
+    return text.strip()
+
+
+# =========================
 # ANALYZE RESUME
 # =========================
 
 def analyze_resume(text):
 
     text_lower = text.lower()
-
-    # -------------------------
-    # Skills Detection
-    # -------------------------
 
     found_skills = {}
 
@@ -127,10 +127,6 @@ def analyze_resume(text):
 
     skill_score = min(100, total_skills * 8)
 
-    # -------------------------
-    # Action Verbs Detection
-    # -------------------------
-
     found_verbs = []
 
     for verb in STRONG_ACTION_VERBS:
@@ -139,27 +135,15 @@ def analyze_resume(text):
 
     impact_score = min(100, len(found_verbs) * 12)
 
-    # -------------------------
-    # Numbers Detection
-    # -------------------------
-
     numbers = re.findall(r"\d+", text)
     quant_score = min(100, len(numbers) * 10)
 
-    # -------------------------
-    # Length Score
-    # -------------------------
-
     word_count = len(text.split())
 
-    if word_count >= 250:
+    if word_count >= 200:
         length_score = 100
     else:
-        length_score = 60
-
-    # -------------------------
-    # Final ATS Score
-    # -------------------------
+        length_score = 70
 
     ats_score = int(
         skill_score * 0.4 +
@@ -167,10 +151,6 @@ def analyze_resume(text):
         quant_score * 0.2 +
         length_score * 0.15
     )
-
-    # -------------------------
-    # Grade
-    # -------------------------
 
     if ats_score >= 85:
         grade = "A"
@@ -181,35 +161,19 @@ def analyze_resume(text):
     else:
         grade = "D"
 
-    # -------------------------
-    # Suggestions
-    # -------------------------
-
     suggestions = []
 
     if skill_score < 50:
-        suggestions.append(
-            "Add more technical skills"
-        )
+        suggestions.append("Add more technical skills")
 
     if impact_score < 40:
-        suggestions.append(
-            "Use stronger action verbs"
-        )
+        suggestions.append("Use stronger action verbs")
 
     if quant_score < 30:
-        suggestions.append(
-            "Add measurable achievements"
-        )
+        suggestions.append("Add measurable achievements")
 
     if not suggestions:
-        suggestions.append(
-            "Excellent Resume Structure"
-        )
-
-    # -------------------------
-    # Final Result
-    # -------------------------
+        suggestions.append("Excellent Resume Structure")
 
     return {
         "overall": ats_score,
@@ -236,7 +200,7 @@ def analyze():
     text = ""
 
     # -------------------------
-    # File Upload
+    # FILE UPLOAD
     # -------------------------
 
     if (
@@ -246,13 +210,21 @@ def analyze():
     ):
 
         file = request.files["resume_file"]
+        filename = file.filename.lower()
 
-        text = extract_text_from_pdf(file)
+        if filename.endswith(".pdf"):
+            text = extract_text_from_pdf(file)
 
-        print("TEXT LENGTH:", len(text))
+        elif filename.endswith(".txt"):
+            text = extract_text_from_txt(file)
+
+        else:
+            return jsonify({
+                "error": "Only PDF and TXT files are supported"
+            }), 400
 
     # -------------------------
-    # Resume Text Paste
+    # TEXT PASTE
     # -------------------------
 
     elif (
@@ -261,28 +233,24 @@ def analyze():
         request.form["resume_text"].strip()
     ):
 
-        text = request.form[
-            "resume_text"
-        ].strip()
+        text = request.form["resume_text"].strip()
 
     else:
         return jsonify({
-            "error":
-            "Please upload resume or paste text"
+            "error": "Please upload PDF/TXT or paste resume text"
         }), 400
 
     # -------------------------
-    # Validation
+    # SAFETY CHECK
     # -------------------------
 
-    if len(text) < 30:
+    if len(text) < 10:
         return jsonify({
-            "error":
-            "Resume content too short"
+            "error": "Could not read enough resume content. Try TXT file or paste text."
         }), 400
 
     # -------------------------
-    # Final Analysis
+    # FINAL ANALYSIS
     # -------------------------
 
     result = analyze_resume(text)
