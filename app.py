@@ -2,18 +2,8 @@ from flask import Flask, render_template, request, jsonify
 import re
 import io
 import pdfplumber
-import pytesseract
-
-from pdf2image import convert_from_bytes
 
 app = Flask(__name__)
-
-# IMPORTANT:
-# Change this path if needed
-
-pytesseract.pytesseract.tesseract_cmd = (
-    r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-)
 
 
 # =========================
@@ -22,13 +12,23 @@ pytesseract.pytesseract.tesseract_cmd = (
 
 SKILLS_DB = {
     "Programming": [
-        "python", "java", "javascript",
-        "c++", "c", "sql", "html", "css"
+        "python",
+        "java",
+        "javascript",
+        "c++",
+        "c",
+        "sql",
+        "html",
+        "css"
     ],
 
     "Web Development": [
-        "react", "node.js", "flask",
-        "django", "mongodb", "mysql"
+        "react",
+        "node.js",
+        "flask",
+        "django",
+        "mongodb",
+        "mysql"
     ],
 
     "AI / ML": [
@@ -40,22 +40,34 @@ SKILLS_DB = {
     ],
 
     "Tools": [
-        "git", "github", "docker",
-        "aws", "linux"
+        "git",
+        "github",
+        "docker",
+        "aws",
+        "linux"
     ]
 }
 
 
+# =========================
+# ACTION VERBS
+# =========================
+
 STRONG_ACTION_VERBS = [
-    "built", "developed", "created",
-    "designed", "implemented",
-    "optimized", "managed",
-    "improved", "launched"
+    "built",
+    "developed",
+    "created",
+    "designed",
+    "implemented",
+    "optimized",
+    "managed",
+    "improved",
+    "launched"
 ]
 
 
 # =========================
-# OCR PDF EXTRACTION
+# PDF TEXT EXTRACTION
 # =========================
 
 def extract_text_from_pdf(file):
@@ -64,12 +76,9 @@ def extract_text_from_pdf(file):
 
     try:
         file.seek(0)
-        pdf_bytes = file.read()
-
-        # First try normal extraction
 
         with pdfplumber.open(
-            io.BytesIO(pdf_bytes)
+            io.BytesIO(file.read())
         ) as pdf:
 
             for page in pdf.pages:
@@ -78,32 +87,24 @@ def extract_text_from_pdf(file):
                 if page_text:
                     text += page_text + "\n"
 
-        # If failed → OCR fallback
-
-        if len(text.strip()) < 30:
-
-            print("Using OCR fallback...")
-
-            images = convert_from_bytes(pdf_bytes)
-
-            for img in images:
-                ocr_text = pytesseract.image_to_string(img)
-                text += ocr_text + "\n"
-
     except Exception as e:
-        print("OCR Error:", e)
+        print("PDF Error:", e)
         text = ""
 
     return text.strip()
 
 
 # =========================
-# ANALYSIS
+# ANALYZE RESUME
 # =========================
 
 def analyze_resume(text):
 
     text_lower = text.lower()
+
+    # -------------------------
+    # Skills Detection
+    # -------------------------
 
     found_skills = {}
 
@@ -126,6 +127,10 @@ def analyze_resume(text):
 
     skill_score = min(100, total_skills * 8)
 
+    # -------------------------
+    # Action Verbs Detection
+    # -------------------------
+
     found_verbs = []
 
     for verb in STRONG_ACTION_VERBS:
@@ -134,8 +139,16 @@ def analyze_resume(text):
 
     impact_score = min(100, len(found_verbs) * 12)
 
+    # -------------------------
+    # Numbers Detection
+    # -------------------------
+
     numbers = re.findall(r"\d+", text)
     quant_score = min(100, len(numbers) * 10)
+
+    # -------------------------
+    # Length Score
+    # -------------------------
 
     word_count = len(text.split())
 
@@ -144,12 +157,33 @@ def analyze_resume(text):
     else:
         length_score = 60
 
+    # -------------------------
+    # Final ATS Score
+    # -------------------------
+
     ats_score = int(
         skill_score * 0.4 +
         impact_score * 0.25 +
         quant_score * 0.2 +
         length_score * 0.15
     )
+
+    # -------------------------
+    # Grade
+    # -------------------------
+
+    if ats_score >= 85:
+        grade = "A"
+    elif ats_score >= 70:
+        grade = "B"
+    elif ats_score >= 55:
+        grade = "C"
+    else:
+        grade = "D"
+
+    # -------------------------
+    # Suggestions
+    # -------------------------
 
     suggestions = []
 
@@ -173,10 +207,16 @@ def analyze_resume(text):
             "Excellent Resume Structure"
         )
 
+    # -------------------------
+    # Final Result
+    # -------------------------
+
     return {
         "overall": ats_score,
+        "grade": grade,
         "word_count": word_count,
         "skills_found": found_skills,
+        "action_verbs": found_verbs,
         "suggestions": suggestions
     }
 
@@ -195,6 +235,10 @@ def analyze():
 
     text = ""
 
+    # -------------------------
+    # File Upload
+    # -------------------------
+
     if (
         "resume_file" in request.files
         and
@@ -207,13 +251,19 @@ def analyze():
 
         print("TEXT LENGTH:", len(text))
 
+    # -------------------------
+    # Resume Text Paste
+    # -------------------------
+
     elif (
         "resume_text" in request.form
         and
         request.form["resume_text"].strip()
     ):
 
-        text = request.form["resume_text"].strip()
+        text = request.form[
+            "resume_text"
+        ].strip()
 
     else:
         return jsonify({
@@ -221,16 +271,28 @@ def analyze():
             "Please upload resume or paste text"
         }), 400
 
+    # -------------------------
+    # Validation
+    # -------------------------
+
     if len(text) < 30:
         return jsonify({
             "error":
             "Resume content too short"
         }), 400
 
+    # -------------------------
+    # Final Analysis
+    # -------------------------
+
     result = analyze_resume(text)
 
     return jsonify(result)
 
+
+# =========================
+# RUN APP
+# =========================
 
 if __name__ == "__main__":
     app.run(debug=True)
